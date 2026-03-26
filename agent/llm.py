@@ -9,7 +9,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MAX_TOKENS = 16384
+# ---------------------------------------------------------------------------
+# Token limits
+# ---------------------------------------------------------------------------
+
+MAX_TOKENS = 16384   # default for large models
+SLM_MAX_TOKENS = 2048  # safe upper bound for small language models
+
+# ---------------------------------------------------------------------------
+# Model constants — Large Language Models
+# ---------------------------------------------------------------------------
 
 # Anthropic
 CLAUDE_MODEL        = "anthropic/claude-sonnet-4-5-20250929"
@@ -31,28 +40,81 @@ GEMINI_3_MODEL      = "gemini/gemini-3-pro-preview"
 GEMINI_MODEL        = "gemini/gemini-2.5-pro"
 GEMINI_FLASH_MODEL  = "gemini/gemini-2.5-flash"
 
-# NVIDIA NIM
-NVIDIA_LLAMA_MODEL  = "nvidia/meta/llama-3.3-70b-instruct"
+# NVIDIA NIM — large
+NVIDIA_LLAMA_MODEL    = "nvidia/meta/llama-3.3-70b-instruct"
 NVIDIA_NEMOTRON_MODEL = "nvidia/nvidia/llama-3.1-nemotron-70b-instruct"
-NVIDIA_MISTRAL_MODEL = "nvidia/mistralai/mistral-large"
+NVIDIA_MISTRAL_MODEL  = "nvidia/mistralai/mistral-large"
 
-# Ollama (local)
-OLLAMA_LLAMA_MODEL  = "ollama/llama3.2"
+# Ollama — large
+OLLAMA_LLAMA_MODEL   = "ollama/llama3.2"
 OLLAMA_MISTRAL_MODEL = "ollama/mistral"
-OLLAMA_GEMMA_MODEL  = "ollama/gemma3"
-OLLAMA_QWEN_MODEL   = "ollama/qwen2.5"
+OLLAMA_GEMMA_MODEL   = "ollama/gemma3"
+OLLAMA_QWEN_MODEL    = "ollama/qwen2.5"
 
-# OpenRouter
+# OpenRouter — large
 OPENROUTER_LLAMA_MODEL   = "openrouter/meta-llama/llama-3.3-70b-instruct"
 OPENROUTER_MISTRAL_MODEL = "openrouter/mistralai/mistral-large"
 OPENROUTER_CLAUDE_MODEL  = "openrouter/anthropic/claude-3.5-sonnet"
 OPENROUTER_GEMINI_MODEL  = "openrouter/google/gemini-2.5-pro"
 
-# Groq
-GROQ_LLAMA_MODEL    = "groq/llama-3.3-70b-versatile"
-GROQ_LLAMA3_MODEL   = "groq/llama3-70b-8192"
-GROQ_MIXTRAL_MODEL  = "groq/mixtral-8x7b-32768"
-GROQ_GEMMA_MODEL    = "groq/gemma2-9b-it"
+# Groq — large
+GROQ_LLAMA_MODEL   = "groq/llama-3.3-70b-versatile"
+GROQ_LLAMA3_MODEL  = "groq/llama3-70b-8192"
+GROQ_MIXTRAL_MODEL = "groq/mixtral-8x7b-32768"
+GROQ_GEMMA_MODEL   = "groq/gemma2-9b-it"
+
+# ---------------------------------------------------------------------------
+# Model constants — Small Language Models (SLM, ≤ ~7 B parameters)
+# ---------------------------------------------------------------------------
+
+# Ollama SLM (local / cloud)
+OLLAMA_SLM_PHI3_MODEL      = "ollama/phi3"            # Phi-3 Mini 3.8 B
+OLLAMA_SLM_PHI35_MODEL     = "ollama/phi3.5"          # Phi-3.5 Mini 3.8 B
+OLLAMA_SLM_PHI4MINI_MODEL  = "ollama/phi4-mini"       # Phi-4 Mini
+OLLAMA_SLM_GEMMA2B_MODEL   = "ollama/gemma2:2b"       # Gemma 2 2 B
+OLLAMA_SLM_LLAMA1B_MODEL   = "ollama/llama3.2:1b"     # Llama 3.2 1 B
+OLLAMA_SLM_LLAMA3B_MODEL   = "ollama/llama3.2:3b"     # Llama 3.2 3 B
+OLLAMA_SLM_QWEN05B_MODEL   = "ollama/qwen2.5:0.5b"    # Qwen 2.5 0.5 B
+OLLAMA_SLM_QWEN15B_MODEL   = "ollama/qwen2.5:1.5b"    # Qwen 2.5 1.5 B
+OLLAMA_SLM_QWEN3B_MODEL    = "ollama/qwen2.5:3b"      # Qwen 2.5 3 B
+OLLAMA_SLM_SMOLLM2_MODEL   = "ollama/smollm2"         # SmolLM2 1.7 B
+
+# OpenRouter SLM
+OPENROUTER_SLM_PHI3_MODEL  = "openrouter/microsoft/phi-3-mini-128k-instruct"
+OPENROUTER_SLM_PHI35_MODEL = "openrouter/microsoft/phi-3.5-mini-instruct"
+OPENROUTER_SLM_GEMMA2B_MODEL = "openrouter/google/gemma-2-2b-it"
+
+# Groq SLM
+GROQ_SLM_LLAMA1B_MODEL = "groq/llama-3.2-1b-preview"
+GROQ_SLM_LLAMA3B_MODEL = "groq/llama-3.2-3b-preview"
+
+# NVIDIA NIM SLM
+NVIDIA_SLM_PHI3_MODEL  = "nvidia/microsoft/phi-3-mini-128k-instruct"
+NVIDIA_SLM_GEMMA2B_MODEL = "nvidia/google/gemma-2-2b-it"
+
+# ---------------------------------------------------------------------------
+# SLM detection
+# ---------------------------------------------------------------------------
+
+# Substrings that identify a model as an SLM (case-insensitive match)
+_SLM_PATTERNS = {
+    "phi3", "phi-3", "phi3.5", "phi-3.5", "phi4-mini", "phi-4-mini",
+    "gemma2:2b", "gemma-2-2b", "gemma2-2b",
+    "llama3.2:1b", "llama3.2:3b", "llama-3.2-1b", "llama-3.2-3b",
+    "qwen2.5:0.5b", "qwen2.5:1.5b", "qwen2.5:3b",
+    "qwen-2.5-0.5b", "qwen-2.5-1.5b", "qwen-2.5-3b",
+    "smollm",
+}
+
+
+def is_slm(model: str) -> bool:
+    """Return True if *model* is recognised as a Small Language Model."""
+    m = model.lower()
+    return any(p in m for p in _SLM_PATTERNS)
+
+# ---------------------------------------------------------------------------
+# OpenAI model-specific quirks
+# ---------------------------------------------------------------------------
 
 # Models that do not accept a temperature parameter
 _NO_TEMPERATURE_MODELS = {"openai/gpt-5", "openai/gpt-5-mini"}
@@ -61,12 +123,15 @@ _NO_TEMPERATURE_MODELS = {"openai/gpt-5", "openai/gpt-5-mini"}
 _MAX_COMPLETION_TOKENS_MODELS = {"openai/gpt-5", "openai/gpt-5-mini", "openai/gpt-5.2"}
 
 
+# ---------------------------------------------------------------------------
+# Model-string parsing
+# ---------------------------------------------------------------------------
+
 def _parse_model(model: str) -> Tuple[str, str]:
     """Return (provider, model_name) from a 'provider/model' string.
 
-    The split is on the first '/' only, so model names that themselves
-    contain slashes (e.g. OpenRouter's 'meta-llama/llama-3.3-70b') are
-    preserved intact.
+    Splits on the first '/' only so model names that contain slashes
+    (e.g. OpenRouter's 'meta-llama/llama-3.3-70b') are preserved intact.
     """
     if "/" in model:
         provider, name = model.split("/", 1)
@@ -237,6 +302,10 @@ def get_response_from_llm(
     if msg_history is None:
         msg_history = []
 
+    # SLMs cannot reliably produce more than SLM_MAX_TOKENS tokens
+    if is_slm(model):
+        max_tokens = min(max_tokens, SLM_MAX_TOKENS)
+
     # Convert text → content for internal API compatibility
     msg_history = [
         {**m, "content": m.pop("text")} if "text" in m else m
@@ -267,19 +336,24 @@ def get_response_from_llm(
 if __name__ == "__main__":
     msg = 'Hello there!'
     models = [
-        ("CLAUDE_MODEL",          CLAUDE_MODEL),
-        ("CLAUDE_HAIKU_MODEL",    CLAUDE_HAIKU_MODEL),
-        ("OPENAI_MODEL",          OPENAI_MODEL),
-        ("OPENAI_O3_MODEL",       OPENAI_O3_MODEL),
-        ("GEMINI_MODEL",          GEMINI_MODEL),
-        ("NVIDIA_LLAMA_MODEL",    NVIDIA_LLAMA_MODEL),
-        ("OLLAMA_LLAMA_MODEL",    OLLAMA_LLAMA_MODEL),
-        ("OPENROUTER_LLAMA_MODEL", OPENROUTER_LLAMA_MODEL),
-        ("GROQ_LLAMA_MODEL",      GROQ_LLAMA_MODEL),
+        ("CLAUDE_MODEL",             CLAUDE_MODEL),
+        ("CLAUDE_HAIKU_MODEL",       CLAUDE_HAIKU_MODEL),
+        ("OPENAI_MODEL",             OPENAI_MODEL),
+        ("OPENAI_O3_MODEL",          OPENAI_O3_MODEL),
+        ("GEMINI_MODEL",             GEMINI_MODEL),
+        ("NVIDIA_LLAMA_MODEL",       NVIDIA_LLAMA_MODEL),
+        ("OLLAMA_LLAMA_MODEL",       OLLAMA_LLAMA_MODEL),
+        ("OPENROUTER_LLAMA_MODEL",   OPENROUTER_LLAMA_MODEL),
+        ("GROQ_LLAMA_MODEL",         GROQ_LLAMA_MODEL),
+        # SLMs
+        ("OLLAMA_SLM_PHI3_MODEL",    OLLAMA_SLM_PHI3_MODEL),
+        ("OLLAMA_SLM_LLAMA3B_MODEL", OLLAMA_SLM_LLAMA3B_MODEL),
+        ("GROQ_SLM_LLAMA3B_MODEL",   GROQ_SLM_LLAMA3B_MODEL),
     ]
     for name, model in models:
+        slm_tag = " [SLM]" if is_slm(model) else ""
         print(f"\n{'='*50}")
-        print(f"Testing {name}: {model}")
+        print(f"Testing {name}{slm_tag}: {model}")
         print('='*50)
         try:
             output_msg, msg_history, info = get_response_from_llm(msg, model=model)
