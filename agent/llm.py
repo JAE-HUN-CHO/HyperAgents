@@ -171,9 +171,10 @@ def _call_nvidia(model_name: str, messages: list, temperature: float, max_tokens
 
 def _call_ollama(model_name: str, messages: list, temperature: float, max_tokens: int) -> str:
     base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    api_key = os.environ.get("OLLAMA_API_KEY", "ollama")  # cloud: real key, local: any string
     return _call_openai_compat(
         base_url=base_url,
-        api_key="ollama",          # Ollama ignores the key but openai SDK requires one
+        api_key=api_key,
         model_name=model_name,
         messages=messages,
         temperature=temperature,
