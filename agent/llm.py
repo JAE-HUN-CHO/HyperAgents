@@ -2,9 +2,10 @@ import backoff
 import os
 from typing import Tuple
 import requests
-import litellm
-from dotenv import load_dotenv
 import json
+import anthropic
+import openai
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -25,7 +26,87 @@ GEMINI_3_MODEL = "gemini/gemini-3-pro-preview"
 GEMINI_MODEL = "gemini/gemini-2.5-pro"
 GEMINI_FLASH_MODEL = "gemini/gemini-2.5-flash"
 
-litellm.drop_params=True
+# Models that do not accept a temperature parameter
+_NO_TEMPERATURE_MODELS = {"openai/gpt-5", "openai/gpt-5-mini"}
+
+# Models that require max_completion_tokens instead of max_tokens
+_MAX_COMPLETION_TOKENS_MODELS = {"openai/gpt-5", "openai/gpt-5-mini", "openai/gpt-5.2"}
+
+
+def _parse_model(model: str) -> Tuple[str, str]:
+    """Return (provider, model_name) from a 'provider/model' string."""
+    if "/" in model:
+        provider, name = model.split("/", 1)
+        return provider, name
+    return "openai", model
+
+
+def _call_anthropic(model_name: str, messages: list, temperature: float, max_tokens: int) -> str:
+    client = anthropic.Anthropic()
+
+    # Pull out any leading system message
+    system = None
+    user_messages = []
+    for m in messages:
+        if m["role"] == "system":
+            system = m["content"]
+        else:
+            user_messages.append(m)
+
+    # claude-3-haiku has a 4096-token output cap
+    if "claude-3-haiku" in model_name:
+        max_tokens = min(max_tokens, 4096)
+
+    kwargs = {
+        "model": model_name,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "messages": user_messages,
+    }
+    if system:
+        kwargs["system"] = system
+
+    response = client.messages.create(**kwargs)
+    return response.content[0].text
+
+
+def _call_openai(model: str, model_name: str, messages: list, temperature: float, max_tokens: int) -> str:
+    client = openai.OpenAI()
+
+    kwargs: dict = {
+        "model": model_name,
+        "messages": messages,
+    }
+
+    # GPT-5 and GPT-5-mini only support default temperature
+    if model not in _NO_TEMPERATURE_MODELS:
+        kwargs["temperature"] = temperature
+
+    # GPT-5 family uses max_completion_tokens
+    if model in _MAX_COMPLETION_TOKENS_MODELS:
+        kwargs["max_completion_tokens"] = max_tokens
+    else:
+        kwargs["max_tokens"] = max_tokens
+
+    response = client.chat.completions.create(**kwargs)
+    return response.choices[0].message.content
+
+
+def _call_gemini(model_name: str, messages: list, temperature: float, max_tokens: int) -> str:
+    # Use Google's OpenAI-compatible endpoint so we don't need a separate SDK
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+    client = openai.OpenAI(
+        api_key=api_key,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    )
+    response = client.chat.completions.create(
+        model=model_name,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    return response.choices[0].message.content
+
 
 @backoff.on_exception(
     backoff.expo,
@@ -43,45 +124,29 @@ def get_response_from_llm(
     if msg_history is None:
         msg_history = []
 
-    # Convert text to content, compatible with LITELLM API
+    # Convert text → content for internal API compatibility
     msg_history = [
-        {**msg, "content": msg.pop("text")} if "text" in msg else msg
-        for msg in msg_history
+        {**m, "content": m.pop("text")} if "text" in m else m
+        for m in msg_history
     ]
 
     new_msg_history = msg_history + [{"role": "user", "content": msg}]
 
-    # Build kwargs - handle model-specific requirements
-    completion_kwargs = {
-        "model": model,
-        "messages": new_msg_history,
-    }
+    provider, model_name = _parse_model(model)
 
-    # GPT-5 and GPT-5-mini only support default temperature (1), skip it
-    # GPT-5.2 supports temperature
-    if model in ["openai/gpt-5", "openai/gpt-5-mini"]:
-        pass  # Don't set temperature
-    else:
-        completion_kwargs["temperature"] = temperature
+    if provider == "anthropic":
+        response_text = _call_anthropic(model_name, new_msg_history, temperature, max_tokens)
+    elif provider == "gemini":
+        response_text = _call_gemini(model_name, new_msg_history, temperature, max_tokens)
+    else:  # openai (default)
+        response_text = _call_openai(model, model_name, new_msg_history, temperature, max_tokens)
 
-    # GPT-5 models require max_completion_tokens instead of max_tokens
-    if "gpt-5" in model:
-        completion_kwargs["max_completion_tokens"] = max_tokens
-    else:
-        # Claude Haiku has a 4096 token limit
-        if "claude-3-haiku" in model:
-            completion_kwargs["max_tokens"] = min(max_tokens, 4096)
-        else:
-            completion_kwargs["max_tokens"] = max_tokens
+    new_msg_history.append({"role": "assistant", "content": response_text})
 
-    response = litellm.completion(**completion_kwargs)
-    response_text = response['choices'][0]['message']['content']  # pyright: ignore
-    new_msg_history.append({"role": "assistant", "content": response['choices'][0]['message']['content']})
-
-    # Convert content to text, compatible with MetaGen API
+    # Convert content → text for MetaGen API compatibility
     new_msg_history = [
-        {**msg, "text": msg.pop("content")} if "content" in msg else msg
-        for msg in new_msg_history
+        {**m, "text": m.pop("content")} if "content" in m else m
+        for m in new_msg_history
     ]
 
     return response_text, new_msg_history, {}
