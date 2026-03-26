@@ -14,7 +14,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 
 MAX_TOKENS = 16384   # default for large models
-SLM_MAX_TOKENS = 2048  # safe upper bound for small language models
+SLM_MAX_TOKENS = 4096  # safe upper bound for small language models
 
 # ---------------------------------------------------------------------------
 # Model constants — Large Language Models

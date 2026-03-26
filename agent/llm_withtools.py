@@ -5,7 +5,7 @@ from agent.llm import get_response_from_llm, is_slm, SLM_MAX_TOKENS, MAX_TOKENS
 
 # SLMs produce short outputs, so a much lower length triggers the truncation retry
 _LLM_RETRY_THRESHOLD = 2000
-_SLM_RETRY_THRESHOLD = 512
+_SLM_RETRY_THRESHOLD = 1024
 
 # SLMs are more fragile with many sequential tool calls
 _LLM_MAX_TOOL_CALLS = 40
