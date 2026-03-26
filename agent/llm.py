@@ -295,10 +295,27 @@ _PROVIDER_MAP = {
 def get_response_from_llm(
     msg: str,
     model: str = OPENAI_MODEL,
+    provider: str | None = None,
     temperature: float = 0.0,
     max_tokens: int = MAX_TOKENS,
     msg_history=None,
 ) -> Tuple[str, list, dict]:
+    """Call an LLM and return (response_text, updated_msg_history, info).
+
+    The model can be specified in two equivalent ways:
+
+        # combined string
+        get_response_from_llm(msg, model="ollama/llama3.2")
+
+        # split arguments
+        get_response_from_llm(msg, model="llama3.2", provider="ollama")
+
+    When *provider* is given it takes precedence over any prefix already
+    present in *model*.
+    """
+    if provider is not None:
+        model = f"{provider}/{model}"
+
     if msg_history is None:
         msg_history = []
 
@@ -314,10 +331,10 @@ def get_response_from_llm(
 
     new_msg_history = msg_history + [{"role": "user", "content": msg}]
 
-    provider, model_name = _parse_model(model)
+    provider_key, model_name = _parse_model(model)
 
-    if provider in _PROVIDER_MAP:
-        response_text = _PROVIDER_MAP[provider](model_name, new_msg_history, temperature, max_tokens)
+    if provider_key in _PROVIDER_MAP:
+        response_text = _PROVIDER_MAP[provider_key](model_name, new_msg_history, temperature, max_tokens)
     else:
         # Default: treat as OpenAI-compatible (covers plain "openai" prefix)
         response_text = _call_openai(model, model_name, new_msg_history, temperature, max_tokens)

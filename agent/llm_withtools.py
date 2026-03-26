@@ -99,6 +99,7 @@ def process_tool_call(tools_dict, tool_name, tool_input):
 def chat_with_agent(
     msg,
     model="claude-4-sonnet-genai",
+    provider=None,            # e.g. "ollama" — combined with model if given
     msg_history=None,
     logging=print,
     tools_available=[],       # Empty list means no tools, 'all' means all tools
@@ -107,6 +108,9 @@ def chat_with_agent(
     max_tokens=None,          # None → auto: SLM_MAX_TOKENS for SLMs, MAX_TOKENS for large
 ):
     from agent.tools import load_tools
+
+    if provider is not None:
+        model = f"{provider}/{model}"
 
     slm = is_slm(model)
     effective_max_tool_calls = max_tool_calls if max_tool_calls is not None \
